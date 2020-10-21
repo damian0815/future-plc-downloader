@@ -151,7 +151,10 @@ func getPageNumber(name string) (int, error) {
 	var n int
 
 	if _, err := fmt.Sscanf(name, "page-%d.pdf", &n); err != nil {
-		return 0, err
+		if _, err := fmt.Sscanf(name, "sd/page-%d.pdf", &n); err != nil {
+			fmt.Println("sscanf", name)
+			return 0, err
+		}
 	}
 
 	if n < 0 {
@@ -164,7 +167,9 @@ func getPageNumber(name string) (int, error) {
 func getPages(zr *zip.Reader) ([]page, error) {
 	pages := make(map[int]page)
 
+	fmt.Println("about to loop")
 	for _, f := range zr.File {
+		fmt.Println("about to ext base from", f.Name)
 		ext := filepath.Ext(f.Name)
 		base := filepath.Base(f.Name)
 
@@ -172,12 +177,14 @@ func getPages(zr *zip.Reader) ([]page, error) {
 			continue
 		}
 
+		fmt.Println("about to getPageNumber")
 		n, err := getPageNumber(f.Name)
 
 		if err != nil {
 			return nil, err
 		}
 
+		fmt.Println("about to Open")
 		fr, err := f.Open()
 
 		if err != nil {
@@ -186,12 +193,14 @@ func getPages(zr *zip.Reader) ([]page, error) {
 
 		defer fr.Close()
 
+		fmt.Println("about to ReadAll")
 		b, err := ioutil.ReadAll(fr)
 
 		if err != nil {
 			return nil, err
 		}
 
+		fmt.Println("about to make reader")
 		pages[n] = page{bytes.NewReader(b)}
 	}
 
@@ -202,12 +211,14 @@ func getPages(zr *zip.Reader) ([]page, error) {
 	var result []page
 
 	for i := 0; i < len(pages); i++ {
+		fmt.Println("about to get page", i)
 		page, ok := pages[i]
 
 		if !ok {
 			return nil, errors.Errorf("Page %d is missing", i)
 		}
 
+		fmt.Println("about to append page", i)
 		result = append(result, page)
 	}
 
@@ -269,24 +280,28 @@ func save(ctx context.Context, issue issue, path string) (err error) {
 	zr, err := download(ctx, issue.URL)
 
 	if err != nil {
+		glog.Error("download")
 		return err
 	}
 
 	pages, err := getPages(zr)
 
 	if err != nil {
+		glog.Error("getPages")
 		return err
 	}
 
 	w, err := unlockAndMerge(pages)
 
 	if err != nil {
+		glog.Error("unlockAndMerge")
 		return err
 	}
 
 	f, err := os.Create(path)
 
 	if err != nil {
+		glog.Error("create(path)")
 		return err
 	}
 
