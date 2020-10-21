@@ -16,7 +16,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
-	"github.com/unidoc/unidoc/pdf"
+	"github.com/unidoc/unidoc/pdf" 
 )
 
 const usage = `Usage of Future plc downloader:
@@ -152,7 +152,7 @@ func getPageNumber(name string) (int, error) {
 
 	if _, err := fmt.Sscanf(name, "page-%d.pdf", &n); err != nil {
 		if _, err := fmt.Sscanf(name, "sd/page-%d.pdf", &n); err != nil {
-			fmt.Println("sscanf", name)
+			fmt.Println("sscanf failed", name)
 			return 0, err
 		}
 	}
@@ -167,9 +167,7 @@ func getPageNumber(name string) (int, error) {
 func getPages(zr *zip.Reader) ([]page, error) {
 	pages := make(map[int]page)
 
-	fmt.Println("about to loop")
 	for _, f := range zr.File {
-		fmt.Println("about to ext base from", f.Name)
 		ext := filepath.Ext(f.Name)
 		base := filepath.Base(f.Name)
 
@@ -177,14 +175,12 @@ func getPages(zr *zip.Reader) ([]page, error) {
 			continue
 		}
 
-		fmt.Println("about to getPageNumber")
 		n, err := getPageNumber(f.Name)
 
 		if err != nil {
 			return nil, err
 		}
 
-		fmt.Println("about to Open")
 		fr, err := f.Open()
 
 		if err != nil {
@@ -193,14 +189,12 @@ func getPages(zr *zip.Reader) ([]page, error) {
 
 		defer fr.Close()
 
-		fmt.Println("about to ReadAll")
 		b, err := ioutil.ReadAll(fr)
 
 		if err != nil {
 			return nil, err
 		}
 
-		fmt.Println("about to make reader")
 		pages[n] = page{bytes.NewReader(b)}
 	}
 
@@ -211,14 +205,12 @@ func getPages(zr *zip.Reader) ([]page, error) {
 	var result []page
 
 	for i := 0; i < len(pages); i++ {
-		fmt.Println("about to get page", i)
 		page, ok := pages[i]
 
 		if !ok {
 			return nil, errors.Errorf("Page %d is missing", i)
 		}
 
-		fmt.Println("about to append page", i)
 		result = append(result, page)
 	}
 
@@ -277,6 +269,7 @@ func unlockAndMerge(pages []page) (*pdf.PdfWriter, error) {
 }
 
 func save(ctx context.Context, issue issue, path string) (err error) {
+	fmt.Println("downloading ", path)
 	zr, err := download(ctx, issue.URL)
 
 	if err != nil {
@@ -284,6 +277,7 @@ func save(ctx context.Context, issue issue, path string) (err error) {
 		return err
 	}
 
+	fmt.Println("collating and saving ", path)
 	pages, err := getPages(zr)
 
 	if err != nil {
@@ -327,9 +321,11 @@ func printUsage() {
 func downloadAll(ctx context.Context, m magazine, issues []issue) {
 	for _, issue := range issues {
 		path := fmt.Sprintf("%s %s.pdf", m.name, issue.Title)
+		fmt.Println(path)
 		temp := fmt.Sprintf("%s.part", path)
 
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			fmt.Println("exists, skipping")
 			continue
 		}
 
